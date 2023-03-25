@@ -1,31 +1,35 @@
 (ns com.wsscode.pathom.viz.codemirror
   (:require [cljs.spec.alpha :as s]
-            [cljsjs.codemirror]
+            ;[cljsjs.codemirror]
             [clojure.string :as str]
             [com.wsscode.fuzzy :as fuzzy]
             [com.wsscode.pathom.connect :as pc]
             [com.fulcrologic.fulcro-css.localized-dom :as dom]
             [com.fulcrologic.fulcro.components :as fc]
             [goog.object :as gobj]
+    ["codemirror" :as codemirror]
 
-            ["codemirror/mode/clojure/clojure"]
-            ["codemirror/addon/edit/matchbrackets"]
-            ["codemirror/addon/edit/closebrackets"]
-            ["codemirror/addon/fold/foldcode"]
-            ["codemirror/addon/fold/foldgutter"]
-            ["codemirror/addon/fold/brace-fold"]
-            ["codemirror/addon/fold/indent-fold"]
-            ["codemirror/addon/selection/active-line"]
-            ["codemirror/addon/search/match-highlighter"]
-            ["codemirror/addon/search/search"]
-            ["codemirror/addon/search/searchcursor"]
-            ["codemirror/addon/hint/anyword-hint"]
-            ["codemirror/addon/hint/show-hint"]
-            ["codemirror/addon/display/placeholder"]
-            ["parinfer-codemirror" :as parinfer-cm]
-            ["./pathom-mode"]
+            ;["codemirror/mode/clojure/clojure"]
+            ;["codemirror/addon/edit/matchbrackets"]
+            ;["codemirror/addon/edit/closebrackets"]
+            ;["codemirror/addon/fold/foldcode"]
+            ;["codemirror/addon/fold/foldgutter"]
+            ;["codemirror/addon/fold/brace-fold"]
+            ;["codemirror/addon/fold/indent-fold"]
+            ;["codemirror/addon/selection/active-line"]
+            ;["codemirror/addon/search/match-highlighter"]
+            ;["codemirror/addon/search/search"]
+            ;["codemirror/addon/search/searchcursor"]
+            ;["codemirror/addon/hint/anyword-hint"]
+            ;["codemirror/addon/hint/show-hint"]
+            ;["codemirror/addon/display/placeholder"]
+            ;["parinfer-codemirror" :as parinfer-cm]
+            ;["./pathom-mode"]
             [com.wsscode.pathom3.connect.indexes :as pci]
             [com.wsscode.pathom3.cache :as p.cache]))
+(.log js/console "codemirror: " codemirror)
+
+(def CodeMirror (.-EditorView codemirror))
 
 (s/def ::mode (s/or :string string? :obj map?))
 (s/def ::theme string?)
@@ -70,7 +74,7 @@
      (let [textarea   (gobj/get this "textNode")
            options    (-> this fc/props ::options (or {}) clj->js)
            process    (-> this fc/props ::process)
-           codemirror (js/CodeMirror.fromTextArea textarea options)]
+           codemirror (CodeMirror. #js{:parent textarea})]
        (reset! pathom-cache {})
 
        (try
@@ -225,7 +229,7 @@
 
 (gobj/set js/window "cljsDeref" deref)
 
-(defn cm-completions [index cm]
+(defn cm-completions [index ^js cm]
   (let [cur   (.getCursor cm)
         ch    (.-ch cur)
         token (.getTokenAt cm cur)
@@ -243,15 +247,15 @@
          (fuzzy/fuzzy-match)
          (map ::fuzzy/string))))
 
-(defn autocomplete [index cm _options]
+(defn autocomplete [index ^js cm _options]
   (let [cur       (.getCursor cm)
         line      (.-line cur)
         ch        (.-ch cur)
         token     (.getTokenAt cm cur)
         reg       (subs (.-string token) 0 (- ch (.-start token)))
         blank?    (#{"[" "{" " " "("} reg)
-        start     (if blank? cur (-> js/CodeMirror (.Pos line (- ch (count reg)))))
-        end       (if blank? cur (-> js/CodeMirror (.Pos line (gobj/get token "end"))))
+        start     (if blank? cur (-> CodeMirror (.Pos line (- ch (count reg)))))
+        end       (if blank? cur (-> CodeMirror (.Pos line (gobj/get token "end"))))
         words     (->> (cm-completions index cm) (mapv first))
         ac-ignore (or (get index ::pc/autocomplete-ignore) #{})]
 
@@ -265,7 +269,7 @@
            :to   end})))
 
 (defn def-cm-command [name f]
-  (gobj/set (gobj/get js/CodeMirror "commands") name f))
+  (gobj/set (gobj/get CodeMirror "commands") name f))
 
 (defn ^:export key-has-children? [completions token]
   (let [reg (str->keyword (gobj/get token "string"))]
@@ -277,8 +281,9 @@
   (str/join (repeat n s)))
 
 (def-cm-command "pathomJoin"
-  (fn [cm]
-    (let [cur    (.getCursor cm)
+  (fn [^js cm]
+    (let [cur ;(.getCursor cm)
+          (-> cm .-state .-selection .-main .-head)
           token  (.getTokenAt cm cur)
           indent (or (gobj/getValueByKeys token #js ["state" "pathStack" "indent"])
                      0)]
@@ -286,16 +291,16 @@
       (if (and (= "attr-list" (gobj/getValueByKeys token #js ["state" "mode"]))
                (= "atom-composite" (gobj/get token "type")))
         (let [line  (.-line cur)
-              start (.Pos js/CodeMirror line (gobj/get token "start"))
-              end   (.Pos js/CodeMirror line (gobj/get token "end"))
+              start (.line cm (gobj/get token "start"))
+              end   (.Pos CodeMirror line (gobj/get token "end"))
               s     (gobj/get token "string")
 
               [cursor-end joined]
               (if (= (.-ch start) indent)
-                [(.Pos js/CodeMirror (inc line) (+ 2 indent))
+                [(.Pos CodeMirror (inc line) (+ 2 indent))
                  (str "{" s "\n" (str-repeat " " (inc indent)) "[]}")]
 
-                [(.Pos js/CodeMirror line (+ (gobj/get token "start")
+                [(.Pos CodeMirror line (+ (gobj/get token "start")
                                             (count s)
                                             3))
                  (str "{" s " []}")])]
@@ -316,12 +321,15 @@
                                               "Cmd-J"      "pathomJoin"}
                  ::gutters                   ["CodeMirror-linenumbers" "CodeMirror-foldgutter"]
                  :pathomIndex                (atom indexes)}]
+
     (editor (-> props
                 (assoc ::process (fn [cm]
                                    (.on cm "keyup" (fn [cm e] (when (and (not (gobj/getValueByKeys cm #js ["state" "completionActive"]))
                                                                          (= 1 (-> (gobj/get e "key") (count))))
                                                                 (js/CodeMirror.showHint cm))))
-                                   (parinfer-cm/init cm "smart" #js {:forceBalance true})))
+                                   cm
+                                   ;(parinfer-cm/init cm "smart" #js {:forceBalance true})
+                                   ))
                 (update ::options #(merge options %))))))
 
 (defn clojure [props]

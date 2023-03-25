@@ -35,11 +35,19 @@ If you want to develop the app:
 
 [source]
 ----
-./scripts/dev-electron
+bb app:dev
 cd shells/electron
 npm install
 npx electron .
 ----
+
+If you get a failure to start with the message: `GPU process isn't usable. Goodbye.`
+
+use:
+[source]
+----
+npx electron . --disable-gpu-sandbox
+```
 
 If you want to run locally with prod performance, do the same replacing
 `./scripts/dev-electron` with `./scripts/build-electron`.

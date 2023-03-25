@@ -1,4 +1,4 @@
-{:deps   {:aliases [:provided :dev :electron :embed]}
+{:deps   {:aliases [:provided :pathom-viz/dev :electron :embed]}
  :builds {:workspaces          {:target           nubank.workspaces.shadow-cljs.target
                                 :ns-regexp        "-(test|cards)$"
                                 :output-dir       "workspaces/assets/js"

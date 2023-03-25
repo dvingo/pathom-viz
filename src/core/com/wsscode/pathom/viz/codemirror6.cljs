@@ -61,6 +61,7 @@
 
 (defn make-extensions [{:keys [state readonly completion-words]
                         :or   {readonly false}}]
+
   (cond-> #js [extensions]
     completion-words
     (.concat #js [(autocomplete/autocompletion
@@ -77,6 +78,7 @@
                       (let [str (.. v -state -doc toString)]
                         (if (not= str @state)
                           (state str)))))])))
+
 
 (h/defnc Editor [{:keys [source props state]
                   :as   options}]

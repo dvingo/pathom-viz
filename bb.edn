@@ -10,11 +10,13 @@
 
   lint-deps
   (when (fs/modified-since ".clj-kondo/.cache" "deps.edn")
-    (shell "bash -c" "clj-kondo --copy-configs --dependencies --lint \"$(clojure -Spath -A:provided:dev)\" --parallel"))
+    (shell "bash -c" "clj-kondo --copy-configs --dependencies --lint \"$(clojure -Spath -A:provided:pathom-viz/dev)\" --parallel"))
 
   lint
   {:depends [lint-deps]
    :task    (shell "clj-kondo --lint src")}
+
+  ;clj-kondo --no-warnings --lint "$(clojure -Spath -A:provided:dev)" --parallel
 
   ; endregion
 
